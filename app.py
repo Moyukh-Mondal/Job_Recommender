@@ -166,16 +166,16 @@ components.html(
             if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
             const rnd = (lo, hi) => lo + Math.random() * (hi - lo);
+            const SPEED = 0.01;   // same speed for every glow (% of screen per ms; smaller = slower)
             const starts = [[0, 0], [100, 0], [100, 100], [0, 100]];
             const blobs = starts.map(function (p) {
                 return { x: p[0], y: p[1], tx: p[0], ty: p[1],
-                         k: 0.0004, wait: rnd(0, 2500), last: performance.now() };
+                         wait: rnd(0, 2500), last: performance.now() };
             });
 
             function pick(b) {
                 b.tx = rnd(0, 100);
                 b.ty = rnd(0, 100);
-                b.k = rnd(0.0002, 0.0006);   // random speed (smaller = slower)
             }
 
             function tick(now) {
@@ -187,12 +187,17 @@ components.html(
                         if (b.wait <= 0) pick(b);
                         return;
                     }
-                    const f = 1 - Math.exp(-dt * b.k);
-                    b.x += (b.tx - b.x) * f;
-                    b.y += (b.ty - b.y) * f;
-                    if (Math.hypot(b.tx - b.x, b.ty - b.y) < 3) {
+                    const dx = b.tx - b.x, dy = b.ty - b.y;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist < 0.3) {
                         b.wait = rnd(300, 4000);   // random rest before next move
+                        return;
                     }
+                    // constant speed, easing out only in the last stretch
+                    const v = SPEED * Math.min(1, dist / 12 + 0.1);
+                    const step = Math.min(v * dt, dist);
+                    b.x += (dx / dist) * step;
+                    b.y += (dy / dist) * step;
                 });
                 app.style.backgroundPosition = "0 0," + blobs.map(function (b) {
                     return b.x.toFixed(2) + "% " + b.y.toFixed(2) + "%";
