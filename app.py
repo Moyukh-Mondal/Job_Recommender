@@ -24,13 +24,17 @@ CUSTOM_CSS = """
         radial-gradient(560px 400px at 85% 8%, rgba(6,182,212,0.30), transparent 70%),
         radial-gradient(620px 460px at 70% 90%, rgba(168,85,247,0.24), transparent 70%),
         radial-gradient(520px 380px at 5% 85%, rgba(16,185,129,0.18), transparent 70%);
-    background-size: 26px 26px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+    background-size: 26px 26px, 200% 200%, 200% 200%, 200% 200%, 200% 200%;
+    background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat;
     background-attachment: fixed;
-    animation: drift 24s ease-in-out infinite alternate;
+    animation: drift 20s ease-in-out infinite alternate;
 }
 @keyframes drift {
-    0%   { background-position: 0 0, 0% 0%,   100% 0%,   100% 100%, 0% 100%; }
-    100% { background-position: 0 0, 12% 10%, 88% 8%,    84% 90%,   10% 88%; }
+    0%   { background-position: 0 0, 0% 0%,     100% 0%,   100% 100%, 0% 100%; }
+    100% { background-position: 0 0, 100% 100%, 0% 100%,   0% 0%,     100% 0%; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .stApp { animation: none; }
 }
 
 /* Transparent top bar, hide footer */
