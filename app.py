@@ -6,6 +6,7 @@ Loads pre-built artifacts once (via st.cache_resource) and serves
 recommendations through recommender.JobRecommender.
 """
 
+import pandas as pd
 import streamlit as st
 from recommender import JobRecommender
 
@@ -14,47 +15,61 @@ st.set_page_config(page_title="Job Recommender", page_icon="💼", layout="wide"
 # ---------------------------------------------------------------- styling
 CUSTOM_CSS = """
 <style>
-/* Background: deep navy with soft indigo / teal glows */
+/* ---------- Background: dot grid + slowly drifting aurora glows ---------- */
 .stApp {
-    background:
-        radial-gradient(900px 500px at 8% -5%, rgba(99,102,241,0.28), transparent 60%),
-        radial-gradient(800px 500px at 100% 0%, rgba(6,182,212,0.20), transparent 55%),
-        linear-gradient(180deg, #0b1020 0%, #0d1326 55%, #0a0f1d 100%);
+    background-color: #060914;
+    background-image:
+        radial-gradient(rgba(148,163,184,0.16) 1px, transparent 1.2px),
+        radial-gradient(600px 420px at 15% 10%, rgba(99,102,241,0.38), transparent 70%),
+        radial-gradient(560px 400px at 85% 8%, rgba(6,182,212,0.30), transparent 70%),
+        radial-gradient(620px 460px at 70% 90%, rgba(168,85,247,0.24), transparent 70%),
+        radial-gradient(520px 380px at 5% 85%, rgba(16,185,129,0.18), transparent 70%);
+    background-size: 26px 26px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
     background-attachment: fixed;
+    animation: drift 24s ease-in-out infinite alternate;
+}
+@keyframes drift {
+    0%   { background-position: 0 0, 0% 0%,   100% 0%,   100% 100%, 0% 100%; }
+    100% { background-position: 0 0, 12% 10%, 88% 8%,    84% 90%,   10% 88%; }
 }
 
 /* Transparent top bar, hide footer */
 header[data-testid="stHeader"] { background: transparent; }
 footer { visibility: hidden; }
 
-/* Narrower, centered content */
-.block-container { max-width: 1150px; padding-top: 2.5rem; padding-bottom: 4rem; }
+/* Hide any heading anchor links */
+[data-testid="stHeaderActionElements"], .stMarkdown a.anchor-link { display: none !important; }
 
-/* Hero */
-.hero { text-align: center; margin: 0.5rem 0 1.8rem 0; }
-.hero h1 {
-    font-size: 3rem; font-weight: 800; letter-spacing: -0.02em; margin: 0;
-    background: linear-gradient(90deg, #a5b4fc 0%, #67e8f9 100%);
+/* Wider centered content */
+.block-container { max-width: 1280px; padding-top: 2.5rem; padding-bottom: 4rem; }
+
+/* ---------- Hero ---------- */
+.hero { text-align: center; margin: 0.5rem 0 2rem 0; }
+.hero-title {
+    font-size: 3.1rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15;
+}
+.hero-text {
+    background: linear-gradient(90deg, #a5b4fc 0%, #67e8f9 60%, #6ee7b7 100%);
     -webkit-background-clip: text; background-clip: text;
     -webkit-text-fill-color: transparent;
 }
-.hero p { color: #94a3b8; font-size: 1.05rem; margin-top: 0.5rem; }
+.hero p { color: #94a3b8; font-size: 1.08rem; margin-top: 0.6rem; }
 
-/* Form card (glass effect) */
+/* ---------- Form card (glass effect) ---------- */
 div[data-testid="stVerticalBlockBorderWrapper"] {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(148,163,184,0.18) !important;
+    background: rgba(255,255,255,0.045);
+    border: 1px solid rgba(148,163,184,0.20) !important;
     border-radius: 18px !important;
     padding: 0.6rem 0.8rem;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.35);
-    backdrop-filter: blur(8px);
+    box-shadow: 0 12px 44px rgba(0,0,0,0.40);
+    backdrop-filter: blur(10px);
 }
 
 /* Inputs */
 div[data-baseweb="select"] > div,
 div[data-baseweb="input"] > div,
 div[data-baseweb="base-input"] {
-    background-color: rgba(15,23,42,0.75) !important;
+    background-color: rgba(10,15,30,0.75) !important;
     border-radius: 10px !important;
 }
 
@@ -85,7 +100,8 @@ button[data-baseweb="tab"] { font-weight: 600; font-size: 1rem; }
 /* Result tables */
 div[data-testid="stDataFrame"] {
     border-radius: 14px; overflow: hidden;
-    border: 1px solid rgba(148,163,184,0.18);
+    border: 1px solid rgba(148,163,184,0.20);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.30);
 }
 
 /* "Searching for" chips */
@@ -119,6 +135,31 @@ def pretty(skill: str) -> str:
     return " ".join(ACRONYMS.get(w, w.capitalize()) for w in skill.split())
 
 
+def format_salary(lo, hi) -> str:
+    """Compact salary range in lakhs per annum, e.g. '₹5.4 – 7.2 LPA'."""
+    if not lo and not hi:
+        return "Not specified"
+    return f"₹{lo / 1e5:.1f} – {hi / 1e5:.1f} LPA"
+
+
+def prepare(df: pd.DataFrame, with_salary: bool) -> pd.DataFrame:
+    """Turn raw results into compact, display-friendly columns that fit
+    on screen without horizontal scrolling."""
+    out = pd.DataFrame()
+    out["Job Title"] = df["title"].astype(str).str.title()
+    out["Company"] = df["companyName"].astype(str).str.title()
+    if with_salary:
+        out["Salary"] = [
+            format_salary(lo, hi)
+            for lo, hi in zip(df["minimumSalary"].fillna(0), df["maximumSalary"].fillna(0))
+        ]
+    lo_exp = df["minimumExperience"].fillna(0).astype(int).astype(str)
+    hi_exp = df["maximumExperience"].fillna(0).astype(int).astype(str)
+    out["Experience"] = lo_exp + " – " + hi_exp + " yrs"
+    out["Match"] = (df["match_score"] * 100).round()
+    return out
+
+
 @st.cache_resource
 def load_recommender(version: int = 4):
     # bump `version` whenever recommender.py changes to force a fresh load
@@ -129,12 +170,10 @@ recommender = load_recommender()
 
 # ---------------------------------------------------------------- header
 st.markdown(
-    """
-    <div class="hero">
-        <h1>💼 Job Recommender</h1>
-        <p>Pick your skills, optionally search by job title, and get matching listings.</p>
-    </div>
-    """,
+    '<div class="hero">'
+    '<div class="hero-title">💼 <span class="hero-text">Job Recommender</span></div>'
+    '<p>Pick your skills, optionally search by job title, and get matching listings.</p>'
+    '</div>',
     unsafe_allow_html=True,
 )
 
@@ -175,14 +214,12 @@ with st.container(border=True):
 
 # ---------------------------------------------------------------- results
 RESULT_CONFIG = {
-    "title": st.column_config.TextColumn("Job Title", width="large"),
-    "companyName": st.column_config.TextColumn("Company"),
-    "minimumSalary": st.column_config.NumberColumn("Min Salary", format="₹%d"),
-    "maximumSalary": st.column_config.NumberColumn("Max Salary", format="₹%d"),
-    "minimumExperience": st.column_config.NumberColumn("Min Exp (yrs)"),
-    "maximumExperience": st.column_config.NumberColumn("Max Exp (yrs)"),
-    "match_score": st.column_config.ProgressColumn(
-        "Match", min_value=0.0, max_value=1.0, format="%.2f"
+    "Job Title": st.column_config.TextColumn("Job Title", width="large"),
+    "Company": st.column_config.TextColumn("Company", width="medium"),
+    "Salary": st.column_config.TextColumn("Salary", width="medium"),
+    "Experience": st.column_config.TextColumn("Experience", width="small"),
+    "Match": st.column_config.ProgressColumn(
+        "Match", min_value=0, max_value=100, format="%d%%", width="small"
     ),
 }
 
@@ -220,16 +257,16 @@ if submitted:
                 st.info("No matches found in this category.")
             else:
                 st.dataframe(
-                    disclosed_df, column_config=RESULT_CONFIG,
-                    hide_index=True, width="stretch",
+                    prepare(disclosed_df, with_salary=True),
+                    column_config=RESULT_CONFIG, hide_index=True, width="stretch",
                 )
         with tab2:
             if undisclosed_df.empty:
                 st.info("No matches found in this category.")
             else:
                 st.dataframe(
-                    undisclosed_df, column_config=RESULT_CONFIG,
-                    hide_index=True, width="stretch",
+                    prepare(undisclosed_df, with_salary=False),
+                    column_config=RESULT_CONFIG, hide_index=True, width="stretch",
                 )
 else:
     st.info("Your results will appear here after you search.")
