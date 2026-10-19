@@ -99,9 +99,3 @@ This reads `data/job_cleaned.csv` and writes a fresh vectorizer, TF-IDF matrix a
 - Streamlit caches the recommender object. After editing `recommender.py`, restart the app or bump the `version` argument of `load_recommender()` in `app.py`.
 - Salary values are shown as stored in the dataset; listings with `0` salary are displayed as "Not specified".
 
-## Ideas for future work
-
-- Build the skill list only from the cleaned `finalSkill` column.
-- Add location and job-type filters.
-- Try embedding-based similarity (e.g. sentence transformers) alongside TF-IDF.
-- Add a "why this match" view showing which of your skills each listing covers.
