@@ -31,7 +31,7 @@ def pretty(skill: str) -> str:
 
 
 @st.cache_resource
-def load_recommender(version: int = 2):
+def load_recommender(version: int = 3):
     # bump `version` whenever recommender.py changes to force a reload
     return JobRecommender()
 
