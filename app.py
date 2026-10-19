@@ -8,6 +8,7 @@ recommendations through recommender.JobRecommender.
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from recommender import JobRecommender
 
 st.set_page_config(page_title="Job Recommender", page_icon="💼", layout="wide")
@@ -119,6 +120,50 @@ div[data-testid="stDataFrame"] {
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+# ---------------------------------------------------------------- cursor glow
+# Runs inside the main page (not the component iframe) so it survives reruns.
+components.html(
+    """
+    <script>
+    const doc = window.parent.document;
+    if (!doc.getElementById("cursor-glow-script")) {
+        const s = doc.createElement("script");
+        s.id = "cursor-glow-script";
+        s.textContent = `
+        (function () {
+            const glow = document.createElement("div");
+            glow.id = "cursor-glow";
+            Object.assign(glow.style, {
+                position: "fixed", top: "0", left: "0",
+                width: "420px", height: "420px", margin: "-210px 0 0 -210px",
+                borderRadius: "50%", pointerEvents: "none", zIndex: "9999",
+                opacity: "0", transition: "opacity .35s ease",
+                background: "radial-gradient(circle, rgba(99,102,241,0.26) 0%, rgba(6,182,212,0.13) 40%, transparent 70%)",
+                mixBlendMode: "screen"
+            });
+            document.body.appendChild(glow);
+
+            let tx = 0, ty = 0, x = 0, y = 0;
+            document.addEventListener("mousemove", function (e) {
+                tx = e.clientX; ty = e.clientY; glow.style.opacity = "1";
+            });
+            document.documentElement.addEventListener("mouseleave", function () {
+                glow.style.opacity = "0";
+            });
+            (function tick() {
+                x += (tx - x) * 0.15; y += (ty - y) * 0.15;
+                glow.style.transform = "translate(" + x + "px," + y + "px)";
+                requestAnimationFrame(tick);
+            })();
+        })();
+        `;
+        doc.head.appendChild(s);
+    }
+    </script>
+    """,
+    height=0,
+)
 
 # Words that should be displayed in a specific form
 ACRONYMS = {
