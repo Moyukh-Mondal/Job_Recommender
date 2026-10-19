@@ -11,7 +11,96 @@ from recommender import JobRecommender
 
 st.set_page_config(page_title="Job Recommender", page_icon="💼", layout="wide")
 
-# Words that should be fully upper-case when displayed
+# ---------------------------------------------------------------- styling
+CUSTOM_CSS = """
+<style>
+/* Background: deep navy with soft indigo / teal glows */
+.stApp {
+    background:
+        radial-gradient(900px 500px at 8% -5%, rgba(99,102,241,0.28), transparent 60%),
+        radial-gradient(800px 500px at 100% 0%, rgba(6,182,212,0.20), transparent 55%),
+        linear-gradient(180deg, #0b1020 0%, #0d1326 55%, #0a0f1d 100%);
+    background-attachment: fixed;
+}
+
+/* Transparent top bar, hide footer */
+header[data-testid="stHeader"] { background: transparent; }
+footer { visibility: hidden; }
+
+/* Narrower, centered content */
+.block-container { max-width: 1150px; padding-top: 2.5rem; padding-bottom: 4rem; }
+
+/* Hero */
+.hero { text-align: center; margin: 0.5rem 0 1.8rem 0; }
+.hero h1 {
+    font-size: 3rem; font-weight: 800; letter-spacing: -0.02em; margin: 0;
+    background: linear-gradient(90deg, #a5b4fc 0%, #67e8f9 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.hero p { color: #94a3b8; font-size: 1.05rem; margin-top: 0.5rem; }
+
+/* Form card (glass effect) */
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(148,163,184,0.18) !important;
+    border-radius: 18px !important;
+    padding: 0.6rem 0.8rem;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+    backdrop-filter: blur(8px);
+}
+
+/* Inputs */
+div[data-baseweb="select"] > div,
+div[data-baseweb="input"] > div,
+div[data-baseweb="base-input"] {
+    background-color: rgba(15,23,42,0.75) !important;
+    border-radius: 10px !important;
+}
+
+/* Skill chips */
+span[data-baseweb="tag"] {
+    background: linear-gradient(135deg, #6366f1, #06b6d4) !important;
+    color: #fff !important;
+    border-radius: 999px !important;
+    font-weight: 500;
+}
+
+/* Primary button */
+div[data-testid="stFormSubmitButton"] button {
+    background: linear-gradient(90deg, #6366f1, #06b6d4);
+    color: white; border: none; border-radius: 12px;
+    padding: 0.7rem 1rem; font-weight: 700; font-size: 1.05rem;
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+div[data-testid="stFormSubmitButton"] button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(99,102,241,0.45);
+    color: white;
+}
+
+/* Tabs */
+button[data-baseweb="tab"] { font-weight: 600; font-size: 1rem; }
+
+/* Result tables */
+div[data-testid="stDataFrame"] {
+    border-radius: 14px; overflow: hidden;
+    border: 1px solid rgba(148,163,184,0.18);
+}
+
+/* "Searching for" chips */
+.chip {
+    display: inline-block; padding: 3px 12px; margin: 2px 4px 2px 0;
+    border-radius: 999px; font-size: 0.85rem; font-weight: 500;
+    background: rgba(99,102,241,0.18); color: #c7d2fe;
+    border: 1px solid rgba(99,102,241,0.4);
+}
+.searching-label { color: #94a3b8; font-weight: 600; margin-right: 6px; }
+</style>
+"""
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+# Words that should be displayed in a specific form
 ACRONYMS = {
     "sql": "SQL", "aws": "AWS", "api": "API", "apis": "APIs", "html": "HTML",
     "css": "CSS", "php": "PHP", "etl": "ETL", "ml": "ML", "ai": "AI",
@@ -21,7 +110,7 @@ ACRONYMS = {
     "javascript": "JavaScript", "typescript": "TypeScript", "mysql": "MySQL",
     "nosql": "NoSQL", "mongodb": "MongoDB", "postgresql": "PostgreSQL",
     "powerbi": "PowerBI", "tensorflow": "TensorFlow", "pytorch": "PyTorch",
-    "aws": "AWS", "dsa": "DSA", "oop": "OOP", "cpp": "C++", "net": ".NET",
+    "dsa": "DSA", "oop": "OOP", "cpp": "C++", "net": ".NET",
 }
 
 
@@ -31,16 +120,23 @@ def pretty(skill: str) -> str:
 
 
 @st.cache_resource
-def load_recommender(version: int = 3):
-    # bump `version` whenever recommender.py changes to force a reload
+def load_recommender(version: int = 4):
+    # bump `version` whenever recommender.py changes to force a fresh load
     return JobRecommender()
 
 
 recommender = load_recommender()
 
 # ---------------------------------------------------------------- header
-st.title("💼 Job Recommender")
-st.caption("Pick your skills, optionally search by job title, and get matching listings.")
+st.markdown(
+    """
+    <div class="hero">
+        <h1>💼 Job Recommender</h1>
+        <p>Pick your skills, optionally search by job title, and get matching listings.</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ---------------------------------------------------------------- search form
 with st.container(border=True):
@@ -78,7 +174,7 @@ with st.container(border=True):
         )
 
 # ---------------------------------------------------------------- results
-DISCLOSED_CONFIG = {
+RESULT_CONFIG = {
     "title": st.column_config.TextColumn("Job Title", width="large"),
     "companyName": st.column_config.TextColumn("Company"),
     "minimumSalary": st.column_config.NumberColumn("Min Salary", format="₹%d"),
@@ -89,6 +185,8 @@ DISCLOSED_CONFIG = {
         "Match", min_value=0.0, max_value=1.0, format="%.2f"
     ),
 }
+
+st.write("")
 
 if submitted:
     skills_query = " ".join(selected_skills)
@@ -108,9 +206,12 @@ if submitted:
             )
 
         if selected_skills:
+            chips = "".join(f'<span class="chip">{pretty(s)}</span>' for s in selected_skills)
             st.markdown(
-                "**Searching for:** " + " ".join(f"`{pretty(s)}`" for s in selected_skills)
+                f'<span class="searching-label">Searching for:</span>{chips}',
+                unsafe_allow_html=True,
             )
+            st.write("")
 
         tab1, tab2 = st.tabs(["💰 With salary info", "❔ Without salary info"])
 
@@ -119,20 +220,16 @@ if submitted:
                 st.info("No matches found in this category.")
             else:
                 st.dataframe(
-                    disclosed_df,
-                    column_config=DISCLOSED_CONFIG,
-                    hide_index=True,
-                    width="stretch",
+                    disclosed_df, column_config=RESULT_CONFIG,
+                    hide_index=True, width="stretch",
                 )
         with tab2:
             if undisclosed_df.empty:
                 st.info("No matches found in this category.")
             else:
                 st.dataframe(
-                    undisclosed_df,
-                    column_config=DISCLOSED_CONFIG,
-                    hide_index=True,
-                    width="stretch",
+                    undisclosed_df, column_config=RESULT_CONFIG,
+                    hide_index=True, width="stretch",
                 )
 else:
     st.info("Your results will appear here after you search.")
