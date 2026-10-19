@@ -136,10 +136,10 @@ components.html(
             glow.id = "cursor-glow";
             Object.assign(glow.style, {
                 position: "fixed", top: "0", left: "0",
-                width: "420px", height: "420px", margin: "-210px 0 0 -210px",
+                width: "240px", height: "240px", margin: "-120px 0 0 -120px",
                 borderRadius: "50%", pointerEvents: "none", zIndex: "9999",
                 opacity: "0", transition: "opacity .35s ease",
-                background: "radial-gradient(circle, rgba(99,102,241,0.26) 0%, rgba(6,182,212,0.13) 40%, transparent 70%)",
+                background: "radial-gradient(circle, rgba(99,102,241,0.13) 0%, rgba(6,182,212,0.06) 40%, transparent 70%)",
                 mixBlendMode: "screen"
             });
             document.body.appendChild(glow);
