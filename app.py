@@ -28,14 +28,8 @@ CUSTOM_CSS = """
     background-size: 26px 26px, 200% 200%, 200% 200%, 200% 200%, 200% 200%;
     background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat;
     background-attachment: fixed;
-    animation: drift 20s ease-in-out infinite alternate;
-}
-@keyframes drift {
-    0%   { background-position: 0 0, 0% 0%,     100% 0%,   100% 100%, 0% 100%; }
-    100% { background-position: 0 0, 100% 100%, 0% 100%,   0% 0%,     100% 0%; }
-}
-@media (prefers-reduced-motion: reduce) {
-    .stApp { animation: none; }
+    /* static starting positions; JS below moves the glows randomly */
+    background-position: 0 0, 0% 0%, 100% 0%, 100% 100%, 0% 100%;
 }
 
 /* Transparent top bar, hide footer */
@@ -136,10 +130,10 @@ components.html(
             glow.id = "cursor-glow";
             Object.assign(glow.style, {
                 position: "fixed", top: "0", left: "0",
-                width: "240px", height: "240px", margin: "-120px 0 0 -120px",
+                width: "150px", height: "150px", margin: "-75px 0 0 -75px",
                 borderRadius: "50%", pointerEvents: "none", zIndex: "9999",
                 opacity: "0", transition: "opacity .35s ease",
-                background: "radial-gradient(circle, rgba(99,102,241,0.13) 0%, rgba(6,182,212,0.06) 40%, transparent 70%)",
+                background: "radial-gradient(circle, rgba(99,102,241,0.24) 0%, rgba(6,182,212,0.12) 40%, transparent 70%)",
                 mixBlendMode: "screen"
             });
             document.body.appendChild(glow);
@@ -159,6 +153,56 @@ components.html(
         })();
         `;
         doc.head.appendChild(s);
+    }
+
+    // Random aura drift: each glow picks its own random target, speed and pause
+    if (!doc.getElementById("aura-drift-script")) {
+        const a = doc.createElement("script");
+        a.id = "aura-drift-script";
+        a.textContent = `
+        (function () {
+            const app = document.querySelector(".stApp");
+            if (!app) return;
+            if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+            const rnd = (lo, hi) => lo + Math.random() * (hi - lo);
+            const starts = [[0, 0], [100, 0], [100, 100], [0, 100]];
+            const blobs = starts.map(function (p) {
+                return { x: p[0], y: p[1], tx: p[0], ty: p[1],
+                         k: 0.0004, wait: rnd(0, 2500), last: performance.now() };
+            });
+
+            function pick(b) {
+                b.tx = rnd(0, 100);
+                b.ty = rnd(0, 100);
+                b.k = rnd(0.0002, 0.0006);   // random speed (smaller = slower)
+            }
+
+            function tick(now) {
+                blobs.forEach(function (b) {
+                    const dt = Math.min(now - b.last, 50);
+                    b.last = now;
+                    if (b.wait > 0) {
+                        b.wait -= dt;
+                        if (b.wait <= 0) pick(b);
+                        return;
+                    }
+                    const f = 1 - Math.exp(-dt * b.k);
+                    b.x += (b.tx - b.x) * f;
+                    b.y += (b.ty - b.y) * f;
+                    if (Math.hypot(b.tx - b.x, b.ty - b.y) < 3) {
+                        b.wait = rnd(300, 4000);   // random rest before next move
+                    }
+                });
+                app.style.backgroundPosition = "0 0," + blobs.map(function (b) {
+                    return b.x.toFixed(2) + "% " + b.y.toFixed(2) + "%";
+                }).join(",");
+                requestAnimationFrame(tick);
+            }
+            requestAnimationFrame(tick);
+        })();
+        `;
+        doc.head.appendChild(a);
     }
     </script>
     """,
