@@ -111,9 +111,6 @@ if submitted:
                 "**Searching for:** " + " ".join(f"`{pretty(s)}`" for s in selected_skills)
             )
 
-        m1, m2 = st.columns(2)
-        m1.metric("With salary info", len(disclosed_df))
-        m2.metric("Without salary info", len(undisclosed_df))
 
         tab1, tab2 = st.tabs(["💰 With salary info", "❔ Without salary info"])
 
