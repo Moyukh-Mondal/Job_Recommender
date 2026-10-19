@@ -50,6 +50,7 @@ class JobRecommender:
         user_experience: float | None = None,
         user_expected_salary: float | None = None,
         title_query: str = "",
+        selected_skills: list[str] | None = None,
         top_n: int = 10,
         salary_tolerance: float = 0.15,
     ):
@@ -59,7 +60,19 @@ class JobRecommender:
         # Rank by skills; if none chosen, fall back to the title text.
         query_text = (user_skills or title_query).lower()
         query_vec = self.vectorizer.transform([query_text])
-        sims = cosine_similarity(query_vec, self.tfidf_matrix).flatten()
+        cos = cosine_similarity(query_vec, self.tfidf_matrix).flatten()
+
+        # Skill coverage: fraction of the chosen skills each job lists (0..1)
+        vocab = self.vectorizer.vocabulary_
+        cols = [vocab[s] for s in (selected_skills or []) if s in vocab]
+        if cols:
+            coverage = np.asarray(
+                (self.tfidf_matrix[:, cols] > 0).mean(axis=1)
+            ).ravel()
+            cos_rel = cos / cos.max() if cos.max() > 0 else cos
+            sims = 0.7 * coverage + 0.3 * cos_rel   # final match score, 0..1
+        else:
+            sims = cos / cos.max() if cos.max() > 0 else cos
 
         mask = np.ones(len(df), dtype=bool)
 
