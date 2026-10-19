@@ -31,8 +31,7 @@ def pretty(skill: str) -> str:
 
 
 @st.cache_resource
-def load_recommender(version: int = 2):
-    # bump `version` whenever recommender.py changes to force a reload
+def load_recommender():
     return JobRecommender()
 
 
@@ -103,6 +102,7 @@ if submitted:
                 user_experience=experience_input if experience_input > 0 else None,
                 user_expected_salary=salary_input if salary_input > 0 else None,
                 title_query=title_query,
+                selected_skills=selected_skills,
                 top_n=top_n,
             )
 
@@ -110,7 +110,6 @@ if submitted:
             st.markdown(
                 "**Searching for:** " + " ".join(f"`{pretty(s)}`" for s in selected_skills)
             )
-
 
         tab1, tab2 = st.tabs(["💰 With salary info", "❔ Without salary info"])
 
