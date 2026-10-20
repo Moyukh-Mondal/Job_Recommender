@@ -259,7 +259,7 @@ def prepare(df: pd.DataFrame, with_salary: bool) -> pd.DataFrame:
 
 
 @st.cache_resource
-def load_recommender(version: int = 4):
+def load_recommender(version: int = 5):
     # bump `version` whenever recommender.py changes to force a fresh load
     return JobRecommender()
 
@@ -332,7 +332,6 @@ if submitted:
     else:
         with st.spinner("Finding matches..."):
             disclosed_df, undisclosed_df = recommender.recommend(
-                user_skills=skills_query,
                 user_experience=experience_input if experience_input > 0 else None,
                 user_expected_salary=salary_input if salary_input > 0 else None,
                 title_query=title_query,

@@ -1,60 +1,89 @@
-"""
-train_model.py
+import argparse
+import json
+from pathlib import Path
 
-Run this ONCE (or whenever job_cleaned.csv is refreshed) to build the
-TF-IDF model artifacts that the Streamlit app loads at runtime.
-
-Usage:
-    python train_model.py
-
-Input:
-    data/job_cleaned.csv   (output of the cleaning notebook)
-
-Output (written to artifacts/):
-    tfidf_vectorizer.pkl
-    tfidf_matrix.npz
-    jobs_model_ready.csv
-"""
-
-import pickle
+import numpy as np
 import pandas as pd
 import scipy.sparse as sp
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 
-DATA_PATH = "data/job_cleaned.csv"
-ARTIFACTS_DIR = "artifacts"
+BASE_DIR = Path(__file__).resolve().parent
+DATA_PATH = BASE_DIR / "data" / "job_cleaned.csv"
+ARTIFACTS_DIR = BASE_DIR / "artifacts"
+
+MIN_SKILL_DF = 5       # a skill must appear in at least this many listings
+MIN_TITLE_DF = 2
+TITLE_NGRAMS = (1, 2)
+TITLE_MAX_FEATURES = 20000
+
+# Columns the app needs at runtime (missing ones are skipped)
+KEEP_COLS = [
+    "title", "companyName", "minimumSalary", "maximumSalary",
+    "minimumExperience", "maximumExperience", "salary_disclosed",
+    "location_clean",
+]
 
 
-def build_combined_text(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
+def parse_skills(text) -> list[str]:
+    """'Machine Learning, SQL , sql' -> ['machine learning', 'sql']"""
+    if not isinstance(text, str):
+        return []
+    skills = dict.fromkeys(s.strip().lower() for s in text.split(","))
+    return [s for s in skills if s]
+
+
+def train(data_path=DATA_PATH, artifacts_dir=ARTIFACTS_DIR):
+    data_path, out = Path(data_path), Path(artifacts_dir)
+    out.mkdir(parents=True, exist_ok=True)
+
+    print(f"Loading {data_path} ...")
+    df = pd.read_csv(data_path)
+    df["title"] = df["title"].fillna("").astype(str)
     df["finalSkill"] = df["finalSkill"].fillna("")
-    df["combined_text"] = df["title"] + " " + df["finalSkill"] + " " + df["finalSkill"]
-    return df
+    n = len(df)
 
-
-def train():
-    print(f"Loading {DATA_PATH} ...")
-    df = pd.read_csv(DATA_PATH)
-    df = build_combined_text(df)
-
-    vectorizer = TfidfVectorizer(
-        stop_words="english",
-        max_features=5000,
-        ngram_range=(1, 2),
-        min_df=2,
+    # ---- skills: one token per comma-separated skill, binary ----
+    skill_cv = CountVectorizer(
+        analyzer=parse_skills, binary=True, min_df=MIN_SKILL_DF, dtype=np.float32
     )
-    tfidf_matrix = vectorizer.fit_transform(df["combined_text"])
+    skill_matrix = skill_cv.fit_transform(df["finalSkill"]).tocsr()
+    skills = [str(s) for s in skill_cv.get_feature_names_out()]
+    doc_freq = np.asarray(skill_matrix.sum(axis=0)).ravel()
+    skill_idf = np.log((1 + n) / (1 + doc_freq)) + 1
 
-    print("TF-IDF matrix shape:", tfidf_matrix.shape)
-    print("Vocabulary size:", len(vectorizer.vocabulary_))
+    # ---- title: separate TF-IDF ----
+    title_vec = TfidfVectorizer(
+        stop_words="english", ngram_range=TITLE_NGRAMS,
+        min_df=MIN_TITLE_DF, max_features=TITLE_MAX_FEATURES,
+    )
+    title_tfidf = title_vec.fit_transform(df["title"]).tocsr()
 
-    with open(f"{ARTIFACTS_DIR}/tfidf_vectorizer.pkl", "wb") as f:
-        pickle.dump(vectorizer, f)
-    sp.save_npz(f"{ARTIFACTS_DIR}/tfidf_matrix.npz", tfidf_matrix)
-    df.to_csv(f"{ARTIFACTS_DIR}/jobs_model_ready.csv", index=False)
+    print("Rows:", n)
+    print("Skill matrix shape:", skill_matrix.shape)
+    print("Title TF-IDF shape:", title_tfidf.shape)
 
-    print(f"Artifacts saved to {ARTIFACTS_DIR}/")
+    # ---- save (JSON + npz, no pickle) ----
+    (out / "skills_vocab.json").write_text(
+        json.dumps({"skills": skills, "idf": [float(x) for x in skill_idf]})
+    )
+    sp.save_npz(out / "skill_matrix.npz", skill_matrix)
+
+    (out / "title_vocab.json").write_text(json.dumps({
+        "vocabulary": {t: int(i) for t, i in title_vec.vocabulary_.items()},
+        "idf": [float(x) for x in title_vec.idf_],
+        "ngram_range": list(TITLE_NGRAMS),
+    }))
+    sp.save_npz(out / "title_tfidf.npz", title_tfidf)
+
+    df[[c for c in KEEP_COLS if c in df.columns]].to_csv(
+        out / "jobs_model_ready.csv", index=False
+    )
+    print(f"Artifacts saved to {out}/")
 
 
 if __name__ == "__main__":
-    train()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data", default=DATA_PATH)
+    parser.add_argument("--out", default=ARTIFACTS_DIR)
+    args = parser.parse_args()
+    train(args.data, args.out)
